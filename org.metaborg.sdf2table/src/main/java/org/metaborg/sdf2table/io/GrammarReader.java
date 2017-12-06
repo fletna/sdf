@@ -55,10 +55,10 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class GrammarReader {
-    
-    
-    private final ITermFactory termFactory;  
-    
+
+
+    private final ITermFactory termFactory;
+
     public GrammarReader(ITermFactory termFactory) {
         this.termFactory = termFactory;
     }
@@ -70,12 +70,12 @@ public class GrammarReader {
         IStrategoTerm mainModule = termFromFile(input, grammar);
         generateGrammar(grammar, mainModule, modules, paths);
         grammar.priorityTransitiveClosure();
-        
+
         return grammar;
     }
 
-    private void generateGrammar(NormGrammar g, IStrategoTerm module, Map<String, Boolean> modules,
-        List<String> paths) throws Exception {
+    private void generateGrammar(NormGrammar g, IStrategoTerm module, Map<String, Boolean> modules, List<String> paths)
+        throws Exception {
 
         if(module instanceof StrategoAppl) {
             StrategoAppl app = (StrategoAppl) module;
@@ -134,10 +134,11 @@ public class GrammarReader {
                 StrategoList sdf_sections = (StrategoList) app.getSubterm(2);
                 for(IStrategoTerm t : sdf_sections) {
                     StrategoAppl tsection = null;
-                    if(!(t.getSubterm(0) instanceof StrategoAppl)) continue;
+                    if(!(t.getSubterm(0) instanceof StrategoAppl))
+                        continue;
                     try {
                         tsection = (StrategoAppl) t.getSubterm(0);
-                    } catch (Exception e) {
+                    } catch(Exception e) {
                         System.out.println("here");
                     }
                     switch(tsection.getName()) {
@@ -169,19 +170,20 @@ public class GrammarReader {
     private void addProds(NormGrammar g, StrategoAppl section) throws UnexpectedTermException {
         if(section instanceof StrategoAppl) {
             StrategoAppl app = (StrategoAppl) section;
-            
+
             if(app.getName().equals("ContextFreeSyntax")) {
                 StrategoList sdf_productions = (StrategoList) app.getSubterm(0);
                 for(IStrategoTerm t : sdf_productions) {
                     processProduction(g, t);
                 }
-            }  if(app.getName().equals("LexicalSyntax")) {
+            }
+            if(app.getName().equals("LexicalSyntax")) {
                 StrategoList sdf_productions = (StrategoList) app.getSubterm(0);
                 for(IStrategoTerm t : sdf_productions) {
                     processProduction(g, t);
                 }
             }
-            
+
             else if(app.getName().equals("Kernel")) {
                 StrategoList sdf_productions = (StrategoList) app.getSubterm(0);
                 for(IStrategoTerm t : sdf_productions) {
@@ -193,7 +195,7 @@ public class GrammarReader {
 
     private IProduction processProduction(NormGrammar g, IStrategoTerm term) throws UnexpectedTermException {
         IProduction prod = null;
-        prod = g.productions_read.get(term.toString());
+        prod = g.getCacheProductionsRead().get(term.toString());
 
         if(prod != null) {
             return prod;
@@ -252,16 +254,16 @@ public class GrammarReader {
 
                 UniqueProduction unique_prod = new UniqueProduction(symbol, rhs_symbols);
 
-                prod = g.prods.get(unique_prod);
+                prod = g.getUniqueProductionMapping().get(unique_prod);
 
                 // production already exists
                 if(prod != null) {
                     for(IAttribute a : attrs) {
-                        g.prod_attrs.put(prod, a);
+                        g.getProductionAttributesMapping().put(prod, a);
                     }
 
                     if(g != null && symbol != null) {
-                        g.productions_read.put(term.toString(), prod);
+                        g.getCacheProductionsRead().put(term.toString(), prod);
                     }
 
                     return prod;
@@ -271,26 +273,26 @@ public class GrammarReader {
                 prod = new Production(symbol, rhs_symbols);
 
                 if(cons_attr != null) {
-                    g.sort_cons_prods.put(new ProductionReference(symbol, cons_attr), prod);
+                    g.getSortConsProductionMapping().put(new ProductionReference(symbol, cons_attr), prod);
                 }
 
-                if(symbol instanceof FileStartSymbol && g.initial_prod == null) {
-                    g.initial_prod = prod;
+                if(symbol instanceof FileStartSymbol && g.getInitialProduction() == null) {
+                    g.setInitialProduction(prod);
                 }
 
                 for(IAttribute a : attrs) {
                     if(a.toString().equals("nlm")) {
-                        g.longest_match_prods.put(prod.rightHand().get(prod.rightHand().size() - 1), prod);
+                        g.getLongestMatchProds().put(prod.rightHand().get(prod.rightHand().size() - 1), prod);
                     }
-                    g.prod_attrs.put(prod, a);
+                    g.getProductionAttributesMapping().put(prod, a);
                 }
 
                 if(g != null && symbol != null) {
-                    g.productions_read.put(term.toString(), prod);
+                    g.getCacheProductionsRead().put(term.toString(), prod);
                 }
 
-                g.symbol_prods.put(symbol, prod);
-                g.prods.put(unique_prod, prod);
+                g.getSymbolProductionsMapping().put(symbol, prod);
+                g.getUniqueProductionMapping().put(unique_prod, prod);
 
                 return prod;
             } else {
@@ -304,7 +306,7 @@ public class GrammarReader {
         Symbol symbol = null;
         String enquoted;
 
-        symbol = g.symbols_read.get(term.toString());
+        symbol = g.getCacheSymbolsRead().get(term.toString());
 
         if(symbol != null) {
             return symbol;
@@ -379,7 +381,7 @@ public class GrammarReader {
         }
 
         if(g != null && symbol != null) {
-            g.symbols_read.put(term.toString(), symbol);
+            g.getCacheSymbolsRead().put(term.toString(), symbol);
         }
 
         return symbol;
@@ -453,6 +455,8 @@ public class GrammarReader {
                             break;
                     }
                     break;
+                case "Recover":
+                    return new GeneralAttribute("recover");
                 case "Reject":
                     return new GeneralAttribute("reject");
                 case "Prefer":
@@ -489,6 +493,9 @@ public class GrammarReader {
                     IStrategoTerm def = a.getSubterm(0);
                     IStrategoAppl term = (IStrategoAppl) def.getSubterm(0);
                     try {
+                        if(term.toString().equals("Fun(Unquoted(\"recover\"))")) {
+                            return new GeneralAttribute("recover");
+                        }
                         IStrategoTerm termAttribute = createStrategoTermAttribute(term);
                         return new TermAttribute(termAttribute, termAttribute.toString());
                     } catch(Exception e) {
@@ -515,8 +522,7 @@ public class GrammarReader {
                 IStrategoTerm child = ((IStrategoList) term.getSubterm(1)).getSubterm(i);
                 subterms[i] = createStrategoTermAttribute((IStrategoAppl) child);
             }
-            return termFactory
-                .makeAppl(termFactory.makeConstructor(cons_name, arity), subterms);
+            return termFactory.makeAppl(termFactory.makeConstructor(cons_name, arity), subterms);
         } else if(term.getConstructor().getName().equals("Fun")) {
             String termName = ((IStrategoString) term.getSubterm(0).getSubterm(0)).stringValue();
             if(((IStrategoAppl) term.getSubterm(0)).getConstructor().getName().equals("Quoted")) {
@@ -626,7 +632,8 @@ public class GrammarReader {
             List<Integer> arguments = Lists.newArrayList();
 
             if(groups.size() != 2) {
-                throw new Exception("Expecting only binary priority relations");
+                throw new Exception("Unexpected normalized priority: " + chain.toString()
+                    + ".\nExpecting only binary priority relations.");
             }
 
             IStrategoTerm first_group = groups.getSubterm(0);
@@ -690,24 +697,24 @@ public class GrammarReader {
             Priority p = new Priority(higher, lower, transitive);
 
             if(transitive) {
-                g.transitive_prio.add(p);
-                g.prio_prods.add(higher);
-                g.prio_prods.add(lower);
+                g.getTransitivePriorities().add(p);
+                g.getProductionsOnPriorities().add(higher);
+                g.getProductionsOnPriorities().add(lower);
 
                 if(arguments.isEmpty()) {
-                    g.trans_prio_arguments.put(p, -1);
+                    g.getTransitivePriorityArgs().put(p, -1);
                 } else {
                     for(Integer arg : arguments) {
-                        g.trans_prio_arguments.put(p, arg);
+                        g.getTransitivePriorityArgs().put(p, arg);
                     }
                 }
             } else {
-                g.non_transitive_prio.add(p);
+                g.getNonTransitivePriorities().add(p);
                 if(arguments.isEmpty()) {
-                    g.non_trans_prio_arguments.put(p, -1);
+                    g.getNonTransitivePriorityArgs().put(p, -1);
                 } else {
                     for(Integer arg : arguments) {
-                        g.non_trans_prio_arguments.put(p, arg);
+                        g.getNonTransitivePriorityArgs().put(p, arg);
                     }
                 }
             }
@@ -723,16 +730,16 @@ public class GrammarReader {
 
             Priority p = new Priority(higher, lower, false);
 
-            g.non_transitive_prio.add(p);
+            g.getNonTransitivePriorities().add(p);
 
             // actual argument values will be processed later when defining recursion
             if(assoc.toString().contains("Left")) {
-                g.non_trans_prio_arguments.put(p, Integer.MAX_VALUE);
+                g.getNonTransitivePriorityArgs().put(p, Integer.MAX_VALUE);
             } else if(assoc.toString().contains("Right")) {
-                g.non_trans_prio_arguments.put(p, Integer.MIN_VALUE);
+                g.getNonTransitivePriorityArgs().put(p, Integer.MIN_VALUE);
             } else {
-                g.non_trans_prio_arguments.put(p, Integer.MIN_VALUE);
-                g.non_trans_prio_arguments.put(p, Integer.MAX_VALUE);
+                g.getNonTransitivePriorityArgs().put(p, Integer.MIN_VALUE);
+                g.getNonTransitivePriorityArgs().put(p, Integer.MAX_VALUE);
             }
 
         } else {
@@ -766,8 +773,7 @@ public class GrammarReader {
         return arguments;
     }
 
-    private IProduction processGroup(NormGrammar g, IStrategoTerm group)
-        throws UnexpectedTermException, Exception {
+    private IProduction processGroup(NormGrammar g, IStrategoTerm group) throws UnexpectedTermException, Exception {
 
         IProduction production = null;
 
@@ -781,7 +787,7 @@ public class GrammarReader {
             ProductionReference prod_ref =
                 new ProductionReference(processSymbol(g, sort), new ConstructorAttribute(cons_name));
 
-            production = g.sort_cons_prods.get(prod_ref);
+            production = g.getSortConsProductionMapping().get(prod_ref);
             if(production == null) {
                 throw new Exception("Production referenced by " + prod_ref + " could not be found.");
             }
@@ -795,7 +801,7 @@ public class GrammarReader {
         return production;
     }
 
-    private IStrategoTerm termFromFile(File file, NormGrammar grammar) {
+    private IStrategoTerm termFromFile(File file, NormGrammar grammar) throws Exception {
         FileReader reader = null;
         IStrategoTerm term = null;
 
@@ -807,9 +813,10 @@ public class GrammarReader {
             reader.close();
 
             term = termFactory.parseFromString(aterm);
-            grammar.sdf3_files.add(file);
+            grammar.getFilesRead().add(file);
         } catch(IOException e) {
-            System.err.println("Cannot open module file `" + file.getPath() + "'");
+            throw new Exception(
+                "Cannot open module file '" + file.getPath() + "'. Try cleaning the project and rebuilding.");
         } finally {
             if(reader != null) {
                 try {
